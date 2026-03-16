@@ -23,6 +23,71 @@ services:
     networks:
       - crypto_network
 
+  redis:
+    image: redis:8-alpine
+    container_name: crypto_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - crypto_network
+  
+  api:
+    build:
+      context: .
+      dockerfile: docker/api/Dockerfile
+    container_name: crypto_api
+    restart: unless-stopped
+    env_file:
+      - ".env"
+    environment:
+      - DB_HOST=db
+      - REDIS_HOST=redis
+      - APP_HOST=0.0.0.0
+      - APP_PORT=8000
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: >
+      sh -c "python -m app.db.migrate && uvicorn app.main:app --host 0.0.0.0 --port 8000"
+    networks:
+      - crypto_network
+    volumes:
+      - ./app:/app/app
+      - ./alembic:/app/alembic
+  worker:
+    build:
+      context: .
+      dockerfile: docker/worker/Dockerfile
+    container_name: crypto_worker
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - DB_HOST=db
+      - REDIS_HOST=redis
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: >
+      sh -c "celery -A app.workers.celery_app worker --loglevel=info --pool=solo &
+              celery -A app.workers.celery_app beat --loglevel=info"
+    networks:
+      - crypto_network
+    volumes:
+      - ./app:/app/app
+
 volumes:
   postgres_data:
     driver: local
