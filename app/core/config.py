@@ -18,7 +18,7 @@ class DataBaseSettings(BaseSettings):
             f"@{self.db_host}:{self.db_port}/{self.db_name}"
         )
 
-    model_config = SettingsConfigDict(env_prefix="DB_")
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 
 class RedisSettings(BaseSettings):

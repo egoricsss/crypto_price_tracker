@@ -1,4 +1,3 @@
-import asyncio
 import sys
 from alembic.config import Config
 from alembic import command
