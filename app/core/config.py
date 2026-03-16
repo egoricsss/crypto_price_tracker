@@ -67,7 +67,7 @@ class CelerySettings(BaseSettings):
 
     fetch_price_interval: int = 60
 
-    model_config = SettingsConfigDict(env_prefix="CELERY_")
+    model_config = SettingsConfigDict(env_prefix="CELERY_", env_nested_delimiter="__")
 
 
 class Settings(BaseSettings):
