@@ -13,7 +13,7 @@ class DeribitClientError(Exception):
 
 class DeribitClient:
 
-    ENDPOINT_INDEX_PRICE = "/api/v2/public/get_index_price"  
+    ENDPOINT_INDEX_PRICE = "/api/v2/public/get_index_price"
     SUPPORTED_INSTRUMENTS = ["BTC_USD", "ETH_USD"]
 
     def __init__(
@@ -31,11 +31,11 @@ class DeribitClient:
     async def _get_session(self) -> ClientSession:
         if self._external_session:
             return self._external_session
-        
+
         if self._session is None or self._session.closed:
             self._session = ClientSession(timeout=self.timeout)
             self.logger.debug("Created new aiohttp session")
-        
+
         return self._session
 
     async def _request(
@@ -46,7 +46,7 @@ class DeribitClient:
     ) -> Dict[str, Any]:
         """
         Базовый метод для выполнения HTTP-запроса.
-        
+
         Args:
             method: HTTP метод (GET, POST).
             endpoint: Путь эндпоинта (например, '/api/v2/public/get_index_price').
@@ -59,34 +59,40 @@ class DeribitClient:
             DeribitClientError: При ошибке запроса или валидации ответа.
         """
         url = f"{self.base_url}{endpoint}"
+        self.logger.debug(f"🌐 HTTP {method.upper()} {url} | params={params}")
         session = await self._get_session()
-        
+
         self.logger.debug(f"Request: {method.upper()} {url} with params {params}")
-        
+
         try:
             async with session.request(
                 method=method,
                 url=url,
                 params=params,
-                headers={"Content-Type": "application/json"}
+                headers={"Content-Type": "application/json"},
             ) as response:
-                
+                self.logger.debug(f"📥 Response status: {response.status}")
+
                 response.raise_for_status()
                 data = await response.json()
-                
+
                 # Deribit использует JSON-RPC формат
                 # Проверяем наличие поля 'result'
                 if "error" in data:
-                    error_msg = data.get("error", {}).get("message", "Unknown API error")
+                    error_msg = data.get("error", {}).get(
+                        "message", "Unknown API error"
+                    )
                     self.logger.error(f"API Error: {error_msg}")
                     raise DeribitClientError(f"Deribit API error: {error_msg}")
-                
+
                 if "result" not in data:
                     self.logger.error(f"Unexpected response format: {data}")
-                    raise DeribitClientError("Invalid response format: missing 'result' field")
-                
+                    raise DeribitClientError(
+                        "Invalid response format: missing 'result' field"
+                    )
+
                 return data["result"]
-                
+
         except ClientError as e:
             self.logger.error(f"HTTP client error: {e}", exc_info=True)
             raise DeribitClientError(f"Request failed: {e}", original_error=e)
@@ -106,21 +112,21 @@ class DeribitClient:
         """
         # Нормализуем название инструмента к формату API (нижний регистр)
         index_name = instrument_name.lower()
-        
+
         try:
             result = await self._request(
                 method="GET",
                 endpoint=self.ENDPOINT_INDEX_PRICE,
-                params={"index_name": index_name}
+                params={"index_name": index_name},
             )
-            
+
             price = result.get("price")
             if price is None:
                 self.logger.warning(f"No price found for {instrument_name}")
                 return None
-            
+
             return float(price)
-            
+
         except DeribitClientError as e:
             self.logger.error(f"Failed to get price for {instrument_name}: {e}")
             raise  # Пробрасываем исключение выше для обработки в сервисе
@@ -128,7 +134,7 @@ class DeribitClient:
     async def get_btc_price(self) -> Optional[float]:
         """
         Получает текущую индексную цену BTC.
-        
+
         Returns:
             Цена BTC в USD.
         """
@@ -137,7 +143,7 @@ class DeribitClient:
     async def get_eth_price(self) -> Optional[float]:
         """
         Получает текущую индексную цену ETH.
-        
+
         Returns:
             Цена ETH в USD.
         """
@@ -146,32 +152,31 @@ class DeribitClient:
     async def get_prices_batch(self) -> Dict[str, Optional[float]]:
         """
         Получает цены для всех отслеживаемых валют (BTC, ETH) параллельно.
-        
+
         Returns:
             Словарь вида {'BTC_USD': 123.45, 'ETH_USD': 67.89}.
         """
         import asyncio
-        
+
         results = {}
         tasks = []
-        
+
         for instrument in self.SUPPORTED_INSTRUMENTS:
             task = self.get_index_price(instrument)
             tasks.append((instrument, task))
-        
+
         # Выполняем запросы параллельно
         completed = await asyncio.gather(
-            *(task for _, task in tasks),
-            return_exceptions=True
+            *(task for _, task in tasks), return_exceptions=True
         )
-        
+
         for (instrument, _), result in zip(tasks, completed):
             if isinstance(result, Exception):
                 self.logger.error(f"Failed to fetch {instrument}: {result}")
                 results[instrument] = None
             else:
                 results[instrument] = result
-        
+
         return results
 
     async def close(self) -> None:
@@ -182,7 +187,7 @@ class DeribitClient:
             await self._session.close()
             self.logger.debug("Closed internal aiohttp session")
 
-    async def __aenter__(self) -> 'DeribitClient':
+    async def __aenter__(self) -> "DeribitClient":
         await self._get_session()
         return self
 

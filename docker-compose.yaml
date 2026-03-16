@@ -82,7 +82,7 @@ services:
         condition: service_healthy
     command: >
       sh -c "celery -A app.workers.celery_app worker --loglevel=info --pool=solo &
-              celery -A app.workers.celery_app beat --loglevel=info"
+             celery -A app.workers.celery_app beat --loglevel=info"
     networks:
       - crypto_network
     volumes:

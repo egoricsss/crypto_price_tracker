@@ -18,6 +18,13 @@ class DataBaseSettings(BaseSettings):
             f"@{self.db_host}:{self.db_port}/{self.db_name}"
         )
 
+    @property
+    def database_url_sync(self) -> str:
+        return (
+            f"postgresql://{self.db_user}:{self.db_password}"
+            f"@{self.db_host}:{self.db_port}/{self.db_name}"
+        )
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 
